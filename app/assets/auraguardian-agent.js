@@ -46,7 +46,7 @@
     };
 
     var xhr = new XMLHttpRequest();
-    xhr.open('POST', AG_API + '/verify', true);
+    xhr.open('POST', AG_API + '/agent/verify', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.setRequestHeader('X-Agent-Version', AG_VERSION);
     xhr.timeout = 5000;
