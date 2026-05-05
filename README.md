@@ -1,14 +1,38 @@
-# AuraGuardian – Shopify Integration
+# AuraGuardian – Shopify Agent v1.1.0
 
 ## Overview
 
 The AuraGuardian Shopify app protects your storefront from automated abuse, credential stuffing, and bot traffic using client-side fingerprinting and cloud-based threat intelligence.
 
+## Risk-Scoring Engine
+
+Every request is evaluated by an **additive 0–100 risk-scoring engine**. Signals are scored independently and summed:
+
+| Signal            | Points | Rationale                          |
+|-------------------|--------|------------------------------------|
+| Empty/missing UA  | +40    | No legitimate browser omits UA     |
+| Headless UA hint  | +25    | Puppeteer, PhantomJS, Playwright   |
+| Missing Accept-*  | +15    | Real browsers always send Accept   |
+| POST without Referer | +20 | Form spam / API abuse pattern      |
+| Rate burst (>24/sec)| +35  | Automated scanning / DDoS          |
+
+## 5-Tier Graduated Response
+
+The cloud decision engine maps the cumulative score to a response tier:
+
+| Tier        | Score Range | Action                                    |
+|-------------|-------------|-------------------------------------------|
+| **ALLOW**   | 0 – 39      | Request proceeds normally                 |
+| **SLOW**    | 40 – 59     | 2-second artificial delay                 |
+| **CHALLENGE** | 60 – 74   | JavaScript challenge page                 |
+| **DECOY**   | 75 – 84     | Serve fake/scrambled content              |
+| **BLOCK**   | 85 – 100    | Hard block (403 / connection reset)       |
+
 ## How It Works
 
 1. **ScriptTag injection** — AuraGuardian registers a lightweight JavaScript agent (`auraguardian-agent.js`) via the Shopify ScriptTag API.
 2. **Fingerprinting** — On each page load, the agent collects browser signals (UA, timezone, screen, touch, etc.) and sends a verify request to the AuraGuardian cloud.
-3. **Decision** — The cloud responds with `allow`, `challenge`, or `block`.
+3. **Decision** — The cloud responds with the appropriate tier action.
 4. **Fail-open** — If the cloud is unreachable, the store operates normally. The agent never breaks checkout or storefront functionality.
 
 ## Installation
@@ -42,13 +66,7 @@ All configuration is managed from the AuraGuardian dashboard:
 | **Protection Mode** | `observe` (log only) or `enforce` (active blocking) |
 | **Challenge Type** | JavaScript challenge or visual CAPTCHA |
 | **Excluded Paths** | Paths to skip (e.g. `/admin`, `/checkout`) |
-| **Rate Limits** | Requests per IP per minute |
-
-## Agent Version
-
-Current: `1.0.0`
-
-The agent version is sent via `X-Agent-Version` header on every verify request, allowing the platform to track which version each store is running.
+| **Rate Limits** | Token-bucket: 8 tokens/sec, 24 burst capacity |
 
 ## Uninstallation
 
