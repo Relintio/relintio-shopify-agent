@@ -145,10 +145,41 @@
     document.body.appendChild(overlay);
   }
 
+  /**
+   * Non-blocking heartbeat ping (async fetch, fire-and-forget).
+   * Throttled to once every 5 minutes via sessionStorage.
+   * Network failures are silently swallowed via .catch().
+   */
+  function sendHeartbeat() {
+    try {
+      var HB_KEY = 'ag_hb_ts';
+      var now = Date.now();
+      var last = parseInt(sessionStorage.getItem(HB_KEY) || '0', 10);
+      if ((now - last) < 300000) return; // 5-minute throttle
+      sessionStorage.setItem(HB_KEY, String(now));
+
+      // Fire-and-forget — no await, .catch() for silent failure
+      fetch(AG_API + '/agent/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          license_key: AG_KEY,
+          domain: window.location.hostname,
+          agent_version: AG_VERSION,
+          timestamp: Math.floor(now / 1000)
+        }),
+        keepalive: true // survives page unload
+      }).catch(function () {});
+    } catch (e) {
+      // Best-effort — never break the store
+    }
+  }
+
   // Boot on DOMContentLoaded
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', verify);
+    document.addEventListener('DOMContentLoaded', function () { verify(); sendHeartbeat(); });
   } else {
     verify();
+    sendHeartbeat();
   }
 })();
