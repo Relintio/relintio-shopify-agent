@@ -13,12 +13,61 @@
   'use strict';
 
   var AG_VERSION = '1.1.0';
-  var AG_API     = '{{API_URL}}';
-  var AG_KEY     = '{{LICENSE_KEY}}';
+  var script = document.currentScript || (function () {
+    var scripts = document.getElementsByTagName('script');
+    return scripts[scripts.length - 1] || null;
+  })();
+
+  function cleanConfig(value) {
+    value = value == null ? '' : String(value).trim();
+    if (!value || /\{\{[^}]+\}\}/.test(value)) return '';
+    return value;
+  }
+
+  function scriptOrigin() {
+    try {
+      if (script && script.src) return new URL(script.src, window.location.href).origin;
+    } catch (e) {}
+    return window.location.origin;
+  }
+
+  var AG_API = cleanConfig(script && script.getAttribute('data-ag-api')) ||
+    cleanConfig('{{API_URL}}') ||
+    (scriptOrigin().replace(/\/$/, '') + '/api');
+
+  var AG_KEY = cleanConfig(script && (script.getAttribute('data-ag-key') || script.getAttribute('data-license-key'))) ||
+    cleanConfig('{{LICENSE_KEY}}') ||
+    cleanConfig(window.AuraGuardian && window.AuraGuardian.licenseKey);
 
   // Abort in admin/checkout/design-mode contexts
   if (window.Shopify && window.Shopify.designMode) return;
   if (/\/(admin|checkout)(\/|$)/i.test(window.location.pathname)) return;
+  if (!AG_API || !AG_KEY) return;
+
+  function consumeChallengeToken() {
+    try {
+      var params = new URLSearchParams(window.location.search || '');
+      var token = params.get('up_token');
+      if (!token) return false;
+
+      sessionStorage.setItem('ag_passed_until', String(Date.now() + 120000));
+      params.delete('up_token');
+      var next = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      window.history.replaceState(null, document.title, next);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function hasRecentPass() {
+    try {
+      var until = parseInt(sessionStorage.getItem('ag_passed_until') || '0', 10);
+      return until > Date.now();
+    } catch (e) {
+      return false;
+    }
+  }
 
   function getFingerprint() {
     var nav = window.navigator || {};
@@ -32,6 +81,7 @@
       cookies:  navigator.cookieEnabled ? 1 : 0,
       dpr:      window.devicePixelRatio || 1,
       webgl:    0,
+      webdriver: nav.webdriver ? 1 : 0,
     };
     try { fp.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch(e) {}
     try {
@@ -56,6 +106,9 @@
       ip:          '',  // resolved server-side
       user_agent:  fp.ua,
       fingerprint: fp,
+      referrer:    document.referrer || '',
+      return_url:  window.location.href,
+      agent_kind:  'shopify',
       agent_type:  'shopify',
       agent_version: AG_VERSION,
     };
@@ -69,9 +122,10 @@
     xhr.onload = function () {
       try {
         var res = JSON.parse(xhr.responseText);
-        if (res && res.action === 'challenge') {
+        var action = String((res && res.action) || '').toLowerCase();
+        if (action === 'challenge') {
           showChallenge(res.challenge_url || '');
-        } else if (res && res.action === 'block') {
+        } else if (action === 'block') {
           showBrandedBlock(res.reason || 'Security Policy', res.ip || '');
         }
         // 'allow', 'slow', 'decoy' — no client-side action
@@ -88,26 +142,19 @@
 
   function showChallenge(url) {
     if (!url) return;
-    var overlay = document.createElement('div');
-    overlay.id = 'ag-challenge-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;';
-    var iframe = document.createElement('iframe');
-    iframe.src = url;
-    iframe.style.cssText = 'width:420px;height:320px;border:none;border-radius:12px;';
-    overlay.appendChild(iframe);
-    document.body.appendChild(overlay);
+    window.location.href = url;
+  }
 
-    window.addEventListener('message', function handler(e) {
-      if (e.data === 'ag-challenge-passed') {
-        overlay.remove();
-        window.removeEventListener('message', handler);
-      }
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, function (ch) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
     });
   }
 
   function showBrandedBlock(reason, ip) {
     var rayId = genRayId();
     var time = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+    var safeReason = escapeHtml(reason);
 
     var overlay = document.createElement('div');
     overlay.id = 'ag-block-overlay';
@@ -130,7 +177,7 @@
           '<p style="font-size:15px;color:#71717a;line-height:1.5;margin-bottom:32px">This request has been blocked by the site&#39;s security system.</p>' +
           '<div style="background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px 20px;text-align:left;font-family:\'SF Mono\',\'Cascadia Code\',\'Fira Code\',monospace;font-size:12px;color:#52525b">' +
             '<div style="display:flex;justify-content:space-between;padding:4px 0"><span style="color:#71717a">Ray ID</span><span style="color:#a1a1aa">' + rayId + '</span></div>' +
-            '<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid rgba(255,255,255,.04)"><span style="color:#71717a">Reason</span><span style="color:#a1a1aa;text-align:right;max-width:60%;word-break:break-all">' + reason + '</span></div>' +
+            '<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid rgba(255,255,255,.04)"><span style="color:#71717a">Reason</span><span style="color:#a1a1aa;text-align:right;max-width:60%;word-break:break-all">' + safeReason + '</span></div>' +
             '<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid rgba(255,255,255,.04)"><span style="color:#71717a">Time</span><span style="color:#a1a1aa">' + time + '</span></div>' +
           '</div>' +
           '<p style="margin-top:32px;font-size:11px;color:#3f3f46">Protected by <a href="https://auraguardian.co" target="_blank" rel="noopener" style="color:#6366f1;text-decoration:none;font-weight:500">AuraGuardian</a></p>' +
@@ -176,6 +223,8 @@
   }
 
   // Boot on DOMContentLoaded
+  if (consumeChallengeToken() || hasRecentPass()) return;
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () { verify(); sendHeartbeat(); });
   } else {

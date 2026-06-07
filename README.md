@@ -24,9 +24,9 @@ The cloud decision engine maps the cumulative score to a response tier:
 |-------------|-------------|-------------------------------------------|
 | **ALLOW**   | 0 – 39      | Request proceeds normally                 |
 | **SLOW**    | 40 – 59     | 2-second artificial delay                 |
-| **CHALLENGE** | 60 – 74   | JavaScript challenge page                 |
+| **CHALLENGE** | 60 – 74   | Hosted security challenge redirect        |
 | **DECOY**   | 75 – 84     | Serve fake/scrambled content              |
-| **BLOCK**   | 85 – 100    | Hard block (403 / connection reset)       |
+| **BLOCK**   | 85 – 100    | Branded storefront block overlay          |
 
 ## How It Works
 
