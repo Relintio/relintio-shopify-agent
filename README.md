@@ -1,4 +1,4 @@
-# AuraGuardian – Shopify Agent v1.1.0
+# AuraGuardian – Shopify Agent v1.1.1
 
 ## Overview
 

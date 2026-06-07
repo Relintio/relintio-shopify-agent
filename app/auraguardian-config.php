@@ -12,7 +12,7 @@
  */
 
 if (!defined('AURAGUARDIAN_SHOPIFY_VERSION')) {
-    define('AURAGUARDIAN_SHOPIFY_VERSION', '1.1.0');
+    define('AURAGUARDIAN_SHOPIFY_VERSION', '1.1.1');
 }
 
 /**

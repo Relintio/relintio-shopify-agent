@@ -1,5 +1,5 @@
 /**
- * AuraGuardian – Shopify ScriptTag Agent v1.1.0
+ * AuraGuardian – Shopify ScriptTag Agent v1.1.1
  *
  * Injected into the storefront via Shopify ScriptTag API.
  * Performs client-side fingerprinting and sends a verify request
@@ -12,7 +12,7 @@
 (function () {
   'use strict';
 
-  var AG_VERSION = '1.1.0';
+  var AG_VERSION = '1.1.1';
   var script = document.currentScript || (function () {
     var scripts = document.getElementsByTagName('script');
     return scripts[scripts.length - 1] || null;
@@ -49,12 +49,26 @@
       var params = new URLSearchParams(window.location.search || '');
       var token = params.get('up_token');
       if (!token) return false;
+      if (!isPlausibleChallengeToken(token)) return false;
 
       sessionStorage.setItem('ag_passed_until', String(Date.now() + 120000));
       params.delete('up_token');
       var next = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
       window.history.replaceState(null, document.title, next);
       return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function isPlausibleChallengeToken(token) {
+    try {
+      var decoded = atob(String(token).replace(/-/g, '+').replace(/_/g, '/'));
+      var parts = decoded.split('::');
+      if (parts.length !== 2 || !/^\d{10,}$/.test(parts[0]) || !/^[a-f0-9]{64}$/i.test(parts[1])) return false;
+      var ts = parseInt(parts[0], 10) * 1000;
+      var now = Date.now();
+      return ts > now - 10 * 60 * 1000 && ts < now + 60 * 1000;
     } catch (e) {
       return false;
     }
