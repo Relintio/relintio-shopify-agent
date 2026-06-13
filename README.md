@@ -1,5 +1,7 @@
 # AuraGuardian – Shopify Agent v1.1.1
 
+> **Note on Features & Quotas**: Advanced features (like Bot Challenge and Custom Shield Pages) are tied to your subscription plan. If you exceed your monthly API quota, the agent will operate in a degraded mode (basic protection) before ultimately failing-open to prevent locking you out of your own site. All configuration rules are centrally managed via the dashboard.
+
 ## Overview
 
 The AuraGuardian Shopify app protects your storefront from automated abuse, credential stuffing, and bot traffic using client-side fingerprinting and cloud-based threat intelligence.
