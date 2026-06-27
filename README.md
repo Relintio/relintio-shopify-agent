@@ -1,10 +1,10 @@
-# AuraGuardian – Shopify Agent v1.1.1
+# Relintio – Shopify Agent v1.1.1
 
 > **Note on Features & Quotas**: Advanced features (like Bot Challenge and Custom Shield Pages) are tied to your subscription plan. If you exceed your monthly API quota, the agent will operate in a degraded mode (basic protection) before ultimately failing-open to prevent locking you out of your own site. All configuration rules are centrally managed via the dashboard.
 
 ## Overview
 
-The AuraGuardian Shopify app protects your storefront from automated abuse, credential stuffing, and bot traffic using client-side fingerprinting and cloud-based threat intelligence.
+The Relintio Shopify app protects your storefront from automated abuse, credential stuffing, and bot traffic using client-side fingerprinting and cloud-based threat intelligence.
 
 ## Risk-Scoring Engine
 
@@ -32,14 +32,14 @@ The cloud decision engine maps the cumulative score to a response tier:
 
 ## How It Works
 
-1. **ScriptTag injection** — AuraGuardian registers a lightweight JavaScript agent (`auraguardian-agent.js`) via the Shopify ScriptTag API.
-2. **Fingerprinting** — On each page load, the agent collects browser signals (UA, timezone, screen, touch, etc.) and sends a verify request to the AuraGuardian cloud.
+1. **ScriptTag injection** — Relintio registers a lightweight JavaScript agent (`relintio-agent.js`) via the Shopify ScriptTag API.
+2. **Fingerprinting** — On each page load, the agent collects browser signals (UA, timezone, screen, touch, etc.) and sends a verify request to the Relintio cloud.
 3. **Decision** — The cloud responds with the appropriate tier action.
 4. **Fail-open** — If the cloud is unreachable, the store operates normally. The agent never breaks checkout or storefront functionality.
 
 ## Installation
 
-### From the AuraGuardian Dashboard
+### From the Relintio Dashboard
 
 1. Go to **Console → Deployment → Shopify**
 2. Enter your Shopify store domain (e.g. `mystore.myshopify.com`)
@@ -52,16 +52,16 @@ If you prefer manual control:
 
 1. Download the agent bundle from Console → Deployment → Shopify
 2. In your Shopify admin, go to **Online Store → Themes → Edit Code**
-3. Create a new snippet called `auraguardian.liquid`
+3. Create a new snippet called `relintio.liquid`
 4. Paste the provided code
 5. Include it in `theme.liquid` before `</head>`:
    ```liquid
-   {% render 'auraguardian' %}
+   {% render 'relintio' %}
    ```
 
 ## Configuration
 
-All configuration is managed from the AuraGuardian dashboard:
+All configuration is managed from the Relintio dashboard:
 
 | Setting | Description |
 |---------|-------------|
@@ -72,7 +72,7 @@ All configuration is managed from the AuraGuardian dashboard:
 
 ## Uninstallation
 
-1. Go to **Shopify Admin → Apps → AuraGuardian → Remove**
-2. Or remove the ScriptTag via the AuraGuardian dashboard
+1. Go to **Shopify Admin → Apps → Relintio → Remove**
+2. Or remove the ScriptTag via the Relintio dashboard
 
 The agent never modifies your theme files, products, or checkout flow. Removal is instant and complete.

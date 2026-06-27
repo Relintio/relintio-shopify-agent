@@ -1,12 +1,12 @@
 /**
- * AuraGuardian – Shopify ScriptTag Agent v1.1.1
+ * Relintio – Shopify ScriptTag Agent v1.1.1
  *
  * Injected into the storefront via Shopify ScriptTag API.
  * Performs client-side fingerprinting and sends a verify request
- * to the AuraGuardian cloud. If the visitor is flagged, it triggers
+ * to the Relintio cloud. If the visitor is flagged, it triggers
  * the challenge flow or branded block overlay.
  *
- * This file is served from the AuraGuardian platform and registered
+ * This file is served from the Relintio platform and registered
  * automatically when the merchant installs the app.
  */
 (function () {
@@ -37,7 +37,7 @@
 
   var AG_KEY = cleanConfig(script && (script.getAttribute('data-ag-key') || script.getAttribute('data-license-key'))) ||
     cleanConfig('{{LICENSE_KEY}}') ||
-    cleanConfig(window.AuraGuardian && window.AuraGuardian.licenseKey);
+    cleanConfig(window.Relintio && window.Relintio.licenseKey);
 
   // Abort in admin/checkout/design-mode contexts
   if (window.Shopify && window.Shopify.designMode) return;
@@ -194,7 +194,7 @@
             '<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid rgba(255,255,255,.04)"><span style="color:#71717a">Reason</span><span style="color:#a1a1aa;text-align:right;max-width:60%;word-break:break-all">' + safeReason + '</span></div>' +
             '<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid rgba(255,255,255,.04)"><span style="color:#71717a">Time</span><span style="color:#a1a1aa">' + time + '</span></div>' +
           '</div>' +
-          '<p style="margin-top:32px;font-size:11px;color:#3f3f46">Protected by <a href="https://auraguardian.co" target="_blank" rel="noopener" style="color:#6366f1;text-decoration:none;font-weight:500">AuraGuardian</a></p>' +
+          '<p style="margin-top:32px;font-size:11px;color:#3f3f46">Protected by <a href="https://relintio.com" target="_blank" rel="noopener" style="color:#6366f1;text-decoration:none;font-weight:500">Relintio</a></p>' +
         '</div>' +
       '</div>';
 
