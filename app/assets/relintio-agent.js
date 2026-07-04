@@ -12,7 +12,7 @@
 (function () {
   'use strict';
 
-  var AG_VERSION = '1.1.1';
+  var RL_VERSION = '1.1.1';
   var script = document.currentScript || (function () {
     var scripts = document.getElementsByTagName('script');
     return scripts[scripts.length - 1] || null;
@@ -31,18 +31,18 @@
     return window.location.origin;
   }
 
-  var AG_API = cleanConfig(script && script.getAttribute('data-ag-api')) ||
+  var RL_API = cleanConfig(script && (script.getAttribute('data-rl-api') || script.getAttribute('data-ag-api'))) ||
     cleanConfig('{{API_URL}}') ||
     (scriptOrigin().replace(/\/$/, '') + '/api');
 
-  var AG_KEY = cleanConfig(script && (script.getAttribute('data-ag-key') || script.getAttribute('data-license-key'))) ||
+  var RL_KEY = cleanConfig(script && (script.getAttribute('data-rl-key') || script.getAttribute('data-ag-key') || script.getAttribute('data-license-key'))) ||
     cleanConfig('{{LICENSE_KEY}}') ||
     cleanConfig(window.Relintio && window.Relintio.licenseKey);
 
   // Abort in admin/checkout/design-mode contexts
   if (window.Shopify && window.Shopify.designMode) return;
   if (/\/(admin|checkout)(\/|$)/i.test(window.location.pathname)) return;
-  if (!AG_API || !AG_KEY) return;
+  if (!RL_API || !RL_KEY) return;
 
   function consumeChallengeToken() {
     try {
@@ -51,7 +51,7 @@
       if (!token) return false;
       if (!isPlausibleChallengeToken(token)) return false;
 
-      sessionStorage.setItem('ag_passed_until', String(Date.now() + 120000));
+      sessionStorage.setItem('rl_passed_until', String(Date.now() + 120000));
       params.delete('up_token');
       var next = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
       window.history.replaceState(null, document.title, next);
@@ -76,7 +76,7 @@
 
   function hasRecentPass() {
     try {
-      var until = parseInt(sessionStorage.getItem('ag_passed_until') || '0', 10);
+      var until = parseInt(sessionStorage.getItem('rl_passed_until') || '0', 10);
       return until > Date.now();
     } catch (e) {
       return false;
@@ -114,7 +114,7 @@
   function verify() {
     var fp = getFingerprint();
     var payload = {
-      license_key: AG_KEY,
+      license_key: RL_KEY,
       domain:      window.location.hostname,
       path:        window.location.pathname,
       ip:          '',  // resolved server-side
@@ -124,13 +124,13 @@
       return_url:  window.location.href,
       agent_kind:  'shopify',
       agent_type:  'shopify',
-      agent_version: AG_VERSION,
+      agent_version: RL_VERSION,
     };
 
     var xhr = new XMLHttpRequest();
-    xhr.open('POST', AG_API + '/agent/verify', true);
+    xhr.open('POST', RL_API + '/agent/verify', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.setRequestHeader('X-Agent-Version', AG_VERSION);
+    xhr.setRequestHeader('X-Agent-Version', RL_VERSION);
     xhr.timeout = 5000;
 
     xhr.onload = function () {
@@ -213,20 +213,20 @@
    */
   function sendHeartbeat() {
     try {
-      var HB_KEY = 'ag_hb_ts';
+      var HB_KEY = 'rl_hb_ts';
       var now = Date.now();
       var last = parseInt(sessionStorage.getItem(HB_KEY) || '0', 10);
       if ((now - last) < 300000) return; // 5-minute throttle
       sessionStorage.setItem(HB_KEY, String(now));
 
       // Fire-and-forget — no await, .catch() for silent failure
-      fetch(AG_API + '/agent/heartbeat', {
+      fetch(RL_API + '/agent/heartbeat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          license_key: AG_KEY,
+          license_key: RL_KEY,
           domain: window.location.hostname,
-          agent_version: AG_VERSION,
+          agent_version: RL_VERSION,
           timestamp: Math.floor(now / 1000)
         }),
         keepalive: true // survives page unload
