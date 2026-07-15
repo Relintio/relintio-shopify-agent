@@ -44,33 +44,24 @@
   if (/\/(admin|checkout)(\/|$)/i.test(window.location.pathname)) return;
   if (!RL_API || !RL_KEY) return;
 
-  function consumeChallengeToken() {
+  function challengeToken() {
     try {
       var params = new URLSearchParams(window.location.search || '');
-      var token = params.get('up_token');
-      if (!token) return false;
-      if (!isPlausibleChallengeToken(token)) return false;
-
-      sessionStorage.setItem('rl_passed_until', String(Date.now() + 120000));
-      params.delete('up_token');
-      var next = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
-      window.history.replaceState(null, document.title, next);
-      return true;
+      return params.get('up_token') || '';
     } catch (e) {
-      return false;
+      return '';
     }
   }
 
-  function isPlausibleChallengeToken(token) {
+  function markChallengePassed() {
     try {
-      var decoded = atob(String(token).replace(/-/g, '+').replace(/_/g, '/'));
-      var parts = decoded.split('::');
-      if (parts.length !== 2 || !/^\d{10,}$/.test(parts[0]) || !/^[a-f0-9]{64}$/i.test(parts[1])) return false;
-      var ts = parseInt(parts[0], 10) * 1000;
-      var now = Date.now();
-      return ts > now - 10 * 60 * 1000 && ts < now + 60 * 1000;
+      sessionStorage.setItem('rl_passed_until', String(Date.now() + 120000));
+      var params = new URLSearchParams(window.location.search || '');
+      params.delete('up_token');
+      var next = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      window.history.replaceState(null, document.title, next);
     } catch (e) {
-      return false;
+      // Best-effort cleanup only
     }
   }
 
@@ -113,6 +104,7 @@
 
   function verify() {
     var fp = getFingerprint();
+    var passToken = challengeToken();
     var payload = {
       license_key: RL_KEY,
       domain:      window.location.hostname,
@@ -125,6 +117,7 @@
       agent_kind:  'shopify',
       agent_type:  'shopify',
       agent_version: RL_VERSION,
+      up_token: passToken,
     };
 
     var xhr = new XMLHttpRequest();
@@ -141,6 +134,8 @@
           showChallenge(res.challenge_url || '');
         } else if (action === 'block') {
           showBrandedBlock(res.reason || 'Security Policy', res.ip || '');
+        } else if (action === 'allow' && passToken && res.reason_code === 'challenge_pass') {
+          markChallengePassed();
         }
         // 'allow', 'slow', 'decoy' — no client-side action
       } catch (e) {
@@ -220,6 +215,8 @@
       sessionStorage.setItem(HB_KEY, String(now));
 
       // Fire-and-forget — no await, .catch() for silent failure
+      var controller = new AbortController();
+      var timeout = setTimeout(function () { controller.abort(); }, 5000);
       fetch(RL_API + '/agent/heartbeat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,15 +226,16 @@
           agent_version: RL_VERSION,
           timestamp: Math.floor(now / 1000)
         }),
-        keepalive: true // survives page unload
-      }).catch(function () {});
+        keepalive: true, // survives page unload
+        signal: controller.signal
+      }).catch(function () {}).finally(function () { clearTimeout(timeout); });
     } catch (e) {
       // Best-effort — never break the store
     }
   }
 
   // Boot on DOMContentLoaded
-  if (consumeChallengeToken() || hasRecentPass()) return;
+  if (hasRecentPass()) return;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () { verify(); sendHeartbeat(); });
