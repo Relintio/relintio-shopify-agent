@@ -6,6 +6,8 @@
 
 The Relintio Shopify app protects your storefront from automated abuse, credential stuffing, and bot traffic using client-side fingerprinting and cloud-based threat intelligence.
 
+The generated ScriptTag uses the canonical control-plane base `https://api.relintio.com/v1`. Existing installations on `https://relintio.com/api` remain compatible, but new deployments must use the canonical base.
+
 ## Risk-Scoring Engine
 
 Every request is evaluated by an **additive 0–100 risk-scoring engine**. Signals are scored independently and summed:
@@ -41,16 +43,16 @@ The cloud decision engine maps the cumulative score to a response tier:
 
 ### From the Relintio Dashboard
 
-1. Go to **Console → Deployment → Shopify**
+1. Go to **Dashboard → Deployment → Shopify**
 2. Enter your Shopify store domain (e.g. `mystore.myshopify.com`)
 3. Authenticate via Shopify OAuth
-4. The platform automatically registers the ScriptTag
+4. Relintio registers the ScriptTag and shows the connected storefront
 
-### Manual Installation (Theme Snippet)
+### Support Recovery Package
 
-If you prefer manual control:
+This is not part of normal setup. Use it only when Relintio support confirms that Shopify authorization cannot be completed:
 
-1. Download the agent bundle from Console → Deployment → Shopify
+1. Request the recovery bundle from Relintio support
 2. In your Shopify admin, go to **Online Store → Themes → Edit Code**
 3. Create a new snippet called `relintio.liquid`
 4. Paste the provided code
@@ -76,3 +78,12 @@ All configuration is managed from the Relintio dashboard:
 2. Or remove the ScriptTag via the Relintio dashboard
 
 The agent never modifies your theme files, products, or checkout flow. Removal is instant and complete.
+
+## Dashboard Deployment Workflow
+
+1. Open **Dashboard → Deployment**, select **Shopify**, and enter the `.myshopify.com` store domain.
+2. Select **Connect Shopify store** and approve the Shopify authorization prompt.
+3. Relintio registers the ScriptTag; open the public storefront once to produce the first check-in.
+4. Enter the public storefront URL in Relintio and select **Verify target**.
+
+There is no installation-mode choice in normal setup. The storefront agent reports runtime kind `shopify`, and policy changes synchronize through the connected Relintio integration.

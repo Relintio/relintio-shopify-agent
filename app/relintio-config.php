@@ -7,7 +7,7 @@
  * into the storefront. The script sends a verify request to the
  * Relintio cloud on each page load.
  *
- * Deployment: installed via the Relintio dashboard (Console → Deployment → Shopify).
+ * Deployment: installed via the Relintio dashboard (Dashboard → Deployment → Shopify).
  * The platform registers the ScriptTag via the Shopify Admin API on your behalf.
  */
 

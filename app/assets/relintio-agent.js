@@ -33,7 +33,7 @@
 
   var RL_API = cleanConfig(script && (script.getAttribute('data-rl-api') || script.getAttribute('data-ag-api'))) ||
     cleanConfig('{{API_URL}}') ||
-    (scriptOrigin().replace(/\/$/, '') + '/api');
+    'https://api.relintio.com/v1';
 
   var RL_KEY = cleanConfig(script && (script.getAttribute('data-rl-key') || script.getAttribute('data-ag-key') || script.getAttribute('data-license-key'))) ||
     cleanConfig('{{LICENSE_KEY}}') ||
@@ -224,6 +224,7 @@
           license_key: RL_KEY,
           domain: window.location.hostname,
           agent_version: RL_VERSION,
+          agent_kind: 'shopify',
           timestamp: Math.floor(now / 1000)
         }),
         keepalive: true, // survives page unload
