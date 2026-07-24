@@ -12,7 +12,7 @@
  */
 
 if (!defined('RELINTIO_SHOPIFY_VERSION')) {
-    define('RELINTIO_SHOPIFY_VERSION', '1.1.1');
+    define('RELINTIO_SHOPIFY_VERSION', '1.1.2');
 }
 
 /**

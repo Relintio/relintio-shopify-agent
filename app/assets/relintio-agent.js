@@ -12,7 +12,7 @@
 (function () {
   'use strict';
 
-  var RL_VERSION = '1.1.1';
+  var RL_VERSION = '1.1.2';
   var script = document.currentScript || (function () {
     var scripts = document.getElementsByTagName('script');
     return scripts[scripts.length - 1] || null;
