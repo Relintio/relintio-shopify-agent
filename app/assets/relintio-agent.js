@@ -1,18 +1,32 @@
 /**
- * Relintio – Shopify ScriptTag Agent v1.1.1
+ * Relintio – Shopify ScriptTag Agent v2.0.0
  *
- * Injected into the storefront via Shopify ScriptTag API.
- * Performs client-side fingerprinting and sends a verify request
- * to the Relintio cloud. If the visitor is flagged, it triggers
- * the challenge flow or branded block overlay.
+ * Injected into the storefront via the Shopify ScriptTag API and served from
+ * the Relintio platform, which means this file and everything printed into it
+ * is readable by every visitor of the store.
  *
- * This file is served from the Relintio platform and registered
- * automatically when the merchant installs the app.
+ * That is why v2 carries a *publishable* key (pk_live_...) rather than the
+ * licence key. The licence key is the HMAC key for the challenge passport and
+ * for request signing; a public one would let anyone mint a passport that waves
+ * themselves past the WAF for this store, and let anyone forge telemetry into
+ * the device reputation store. A publishable key holds one scope — decision:read
+ * — so the worst a stranger can do with the key in this file is ask whether
+ * their own request would be allowed.
+ *
+ * For the same reason this talks to /agent/decision rather than /agent/verify.
+ * The verify endpoint answers with the policy: the rule set, the thresholds,
+ * the blocklists. A browser is the last place any of that should be. The
+ * decision endpoint answers with a verdict and keeps the reasoning server-side.
+ *
+ * Upgrading from v1.x: the ScriptTag URL is unchanged. The platform substitutes
+ * a publishable key where it used to substitute the licence key, and the
+ * heartbeat call is gone — the server derives liveness from the decisions this
+ * asks for, which is a signal a public key cannot forge.
  */
 (function () {
   'use strict';
 
-  var RL_VERSION = '1.1.2';
+  var RL_VERSION = '2.0.0';
   var script = document.currentScript || (function () {
     var scripts = document.getElementsByTagName('script');
     return scripts[scripts.length - 1] || null;
@@ -24,25 +38,44 @@
     return value;
   }
 
-  function scriptOrigin() {
-    try {
-      if (script && script.src) return new URL(script.src, window.location.href).origin;
-    } catch (e) {}
-    return window.location.origin;
-  }
-
   var RL_API = cleanConfig(script && (script.getAttribute('data-rl-api') || script.getAttribute('data-ag-api'))) ||
     cleanConfig('{{API_URL}}') ||
     'https://api.relintio.com/v1';
 
+  // `data-rl-key` now expects a publishable key. The older attribute names are
+  // still read so an un-updated theme snippet keeps working, but a licence key
+  // supplied through any of them is refused below rather than sent.
   var RL_KEY = cleanConfig(script && (script.getAttribute('data-rl-key') || script.getAttribute('data-ag-key') || script.getAttribute('data-license-key'))) ||
-    cleanConfig('{{LICENSE_KEY}}') ||
-    cleanConfig(window.Relintio && window.Relintio.licenseKey);
+    cleanConfig('{{PUBLISHABLE_KEY}}') ||
+    cleanConfig(window.Relintio && (window.Relintio.publishableKey || window.Relintio.licenseKey));
 
   // Abort in admin/checkout/design-mode contexts
   if (window.Shopify && window.Shopify.designMode) return;
   if (/\/(admin|checkout)(\/|$)/i.test(window.location.pathname)) return;
   if (!RL_API || !RL_KEY) return;
+
+  // A licence key in a storefront script is a security incident, not a
+  // configuration quirk to route around. Refusing to send it is the point:
+  // failing loudly in the console beats quietly publishing the key.
+  if (RL_KEY.indexOf('pk_') !== 0) {
+    if (window.console && console.error) {
+      console.error('[Relintio] Refusing to start: data-rl-key must be a publishable key (pk_live_...). ' +
+        'A licence key must never appear in storefront JavaScript. ' +
+        'Get a publishable key from Dashboard → Deployment → Shopify.');
+    }
+    return;
+  }
+
+  // --- begin inlined agents/shared/collector.js -------------------------------
+  // Verbatim copy of the shared collector. SdkCollectorParityTest asserts this
+  // block matches the shared source exactly — edit agents/shared/collector.js
+  // and re-run `php artisan relintio:sync-collector`, never edit it here.
+  // @@COLLECTOR_START@@
+  // @@COLLECTOR_END@@
+  // --- end inlined agents/shared/collector.js ---------------------------------
+
+  var collector = window.RelintioCollector;
+  var behaviour = collector && collector.watchBehaviour ? collector.watchBehaviour() : null;
 
   function challengeToken() {
     try {
@@ -74,54 +107,41 @@
     }
   }
 
-  function getFingerprint() {
-    var nav = window.navigator || {};
-    var fp = {
-      ua:       nav.userAgent || '',
-      lang:     nav.language || '',
-      platform: nav.platform || '',
-      screen:   (screen.width || 0) + 'x' + (screen.height || 0),
-      tz:       '',
-      touch:    'ontouchstart' in window ? 1 : 0,
-      cookies:  navigator.cookieEnabled ? 1 : 0,
-      dpr:      window.devicePixelRatio || 1,
-      webgl:    0,
-      webdriver: nav.webdriver ? 1 : 0,
-    };
-    try { fp.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch(e) {}
-    try {
-      var c = document.createElement('canvas');
-      fp.webgl = !!(c.getContext('webgl') || c.getContext('experimental-webgl')) ? 1 : 0;
-    } catch(e) {}
-    return fp;
-  }
-
   function genRayId() {
     var hex = '0123456789abcdef', id = '';
     for (var i = 0; i < 16; i++) id += hex[Math.random() * 16 | 0];
     return id;
   }
 
-  function verify() {
-    var fp = getFingerprint();
-    var passToken = challengeToken();
-    var payload = {
+  function decide() {
+    var collected = collector
+      ? collector.collect({ behaviour: behaviour })
+      : Promise.resolve({ telemetry: {}, env: {} });
+
+    collected.then(send).catch(function () {
+      // A collector that failed must not cost the store its verdict — the
+      // server still has the address, the headers and the path, and a shop
+      // that only protects visitors whose browser cooperated protects nobody.
+      send({ telemetry: {}, env: {} });
+    });
+  }
+
+  function send(payload) {
+    var body = {
       license_key: RL_KEY,
-      domain:      window.location.hostname,
-      path:        window.location.pathname,
-      ip:          '',  // resolved server-side
-      user_agent:  fp.ua,
-      fingerprint: fp,
-      referrer:    document.referrer || '',
-      return_url:  window.location.href,
-      agent_kind:  'shopify',
-      agent_type:  'shopify',
+      domain: window.location.hostname,
+      path: window.location.pathname,
+      referrer: document.referrer || '',
+      return_url: window.location.href,
+      agent_kind: 'shopify',
       agent_version: RL_VERSION,
-      up_token: passToken,
+      up_token: challengeToken(),
+      telemetry: payload.telemetry || {},
+      env: payload.env || {}
     };
 
     var xhr = new XMLHttpRequest();
-    xhr.open('POST', RL_API + '/agent/verify', true);
+    xhr.open('POST', RL_API + '/agent/decision', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.setRequestHeader('X-Agent-Version', RL_VERSION);
     xhr.timeout = 5000;
@@ -134,7 +154,7 @@
           showChallenge(res.challenge_url || '');
         } else if (action === 'block') {
           showBrandedBlock(res.reason || 'Security Policy', res.ip || '');
-        } else if (action === 'allow' && passToken && res.reason_code === 'challenge_pass') {
+        } else if (action === 'allow' && body.up_token && res.reason_code === 'challenge_pass') {
           markChallengePassed();
         }
         // 'allow', 'slow', 'decoy' — no client-side action
@@ -146,7 +166,7 @@
     xhr.onerror = function () { /* fail open */ };
     xhr.ontimeout = function () { /* fail open */ };
 
-    xhr.send(JSON.stringify(payload));
+    xhr.send(JSON.stringify(body));
   }
 
   function showChallenge(url) {
@@ -201,47 +221,12 @@
     document.body.appendChild(overlay);
   }
 
-  /**
-   * Non-blocking heartbeat ping (async fetch, fire-and-forget).
-   * Throttled to once every 5 minutes via sessionStorage.
-   * Network failures are silently swallowed via .catch().
-   */
-  function sendHeartbeat() {
-    try {
-      var HB_KEY = 'rl_hb_ts';
-      var now = Date.now();
-      var last = parseInt(sessionStorage.getItem(HB_KEY) || '0', 10);
-      if ((now - last) < 300000) return; // 5-minute throttle
-      sessionStorage.setItem(HB_KEY, String(now));
-
-      // Fire-and-forget — no await, .catch() for silent failure
-      var controller = new AbortController();
-      var timeout = setTimeout(function () { controller.abort(); }, 5000);
-      fetch(RL_API + '/agent/heartbeat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          license_key: RL_KEY,
-          domain: window.location.hostname,
-          agent_version: RL_VERSION,
-          agent_kind: 'shopify',
-          timestamp: Math.floor(now / 1000)
-        }),
-        keepalive: true, // survives page unload
-        signal: controller.signal
-      }).catch(function () {}).finally(function () { clearTimeout(timeout); });
-    } catch (e) {
-      // Best-effort — never break the store
-    }
-  }
-
   // Boot on DOMContentLoaded
   if (hasRecentPass()) return;
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { verify(); sendHeartbeat(); });
+    document.addEventListener('DOMContentLoaded', decide);
   } else {
-    verify();
-    sendHeartbeat();
+    decide();
   }
 })();
